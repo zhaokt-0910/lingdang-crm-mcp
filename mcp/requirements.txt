@@ -1,0 +1,4 @@
+# 灵当CRM MCP Server v4 — 零依赖
+#
+# 本版本不依赖任何第三方包，仅使用 Python 标准库（urllib / json / logging 等）。
+# 任意 Python 3.8+ 均可直接运行 server.py，无需 pip install。
