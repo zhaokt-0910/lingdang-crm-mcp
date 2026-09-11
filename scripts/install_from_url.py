@@ -8,8 +8,12 @@
 
 流程:
   1) 下载 zip 到临时文件
-  2) 校验是合法 zip 且包含 lingdang-crm-setup/SKILL.md
-  3) 解压到目标 skills 目录（默认 ~/.workbuddy/skills）
+  2) 校验是合法 zip 且包含 SKILL.md（兼容三种布局：
+     lingdang-crm-setup/SKILL.md 原始布局 /
+     <任意目录>/SKILL.md 如 GitHub 自动打包的 <repo>-<branch>/ 布局 /
+     SKILL.md 平铺布局）
+  3) 解压到目标 skills 目录（默认 ~/.workbuddy/skills），
+     统一落位为 lingdang-crm-setup/ 子目录
   4) 输出 JSON 结果（供 AI 解析）
 
 安全:
@@ -29,6 +33,24 @@ from pathlib import Path
 
 TOP_DIR = "lingdang-crm-setup"
 SKILL_ENTRY = f"{TOP_DIR}/SKILL.md"
+
+
+def find_skill_prefix(names):
+    """定位 SKILL.md 在 zip 内的根前缀。
+
+    返回值:
+      ''            —— SKILL.md 平铺在 zip 根（如 GitHub codeload 打包）
+      '<dirname>/'  —— SKILL.md 在唯一一级子目录内（如 lingdang-crm-setup/ 或
+                       GitHub 自动打包的 <repo>-<branch>/）
+      None          —— 未找到 SKILL.md
+    """
+    if "SKILL.md" in names:
+        return ""
+    # 收集所有「一级子目录/SKILL.md」形式的条目
+    roots = [n.split("/")[0] for n in names if n.count("/") == 1 and n.endswith("/SKILL.md")]
+    if len(roots) == 1:
+        return roots[0] + "/"
+    return None
 
 
 def _encode_url(url: str) -> str:
@@ -55,12 +77,25 @@ def download(url: str, dest: str, timeout: int = 60) -> None:
             raise ValueError("下载内容为空（地址可能返回了空文件）")
 
 
-def safe_extract(zf: zipfile.ZipFile, dest_dir: Path) -> int:
-    """安全解压：拒绝路径穿越与绝对路径，返回解压文件数。"""
+def safe_extract(zf: zipfile.ZipFile, dest_dir: Path, strip_prefix: str = "") -> int:
+    """安全解压：拒绝路径穿越与绝对路径，返回解压文件数。
+
+    strip_prefix 非空时，先剥离 zip 条目的根前缀（如 lingdang-crm-mcp-main/），
+    再统一落位到 dest_dir/lingdang-crm-setup/ 下。
+    """
     count = 0
     for member in zf.infolist():
-        # 归一化并检查路径安全
+        # 归一化并剥离根前缀
         name = member.filename.replace("\\", "/")
+        if strip_prefix:
+            if name == strip_prefix.rstrip("/"):
+                continue  # 根目录条目本身
+            if not name.startswith(strip_prefix):
+                continue  # 跳过前缀之外的无关条目
+            name = name[len(strip_prefix):]
+        if not name:
+            continue
+        # 检查路径安全
         parts = [p for p in name.split("/") if p not in ("", ".")]
         if any(p == ".." for p in parts):
             raise ValueError(f"发现非法路径条目，已中止：{member.filename}")
@@ -68,9 +103,9 @@ def safe_extract(zf: zipfile.ZipFile, dest_dir: Path) -> int:
             raise ValueError(f"发现绝对路径条目，已中止：{member.filename}")
         # 目录条目
         if member.is_dir():
-            (dest_dir / name).mkdir(parents=True, exist_ok=True)
+            (dest_dir / TOP_DIR / name).mkdir(parents=True, exist_ok=True)
             continue
-        target = dest_dir / name
+        target = dest_dir / TOP_DIR / name
         target.parent.mkdir(parents=True, exist_ok=True)
         with zf.open(member) as src, open(target, "wb") as dst:
             dst.write(src.read())
@@ -91,15 +126,22 @@ def install(url: str, skills_dir: Path) -> dict:
 
         with zipfile.ZipFile(tmp_path) as zf:
             names = zf.namelist()
-            if SKILL_ENTRY not in names:
+            prefix = find_skill_prefix(names)
+            if prefix is None:
                 return {
                     "code": "error",
-                    "msg": f"不是灵当CRM 交付包：缺少 {SKILL_ENTRY}（共 {len(names)} 个条目）",
+                    "msg": f"不是灵当CRM 交付包：缺少 SKILL.md（共 {len(names)} 个条目）",
                     "url": url,
                 }
             # 先探测一遍安全性，再落盘
             for member in zf.infolist():
                 name = member.filename.replace("\\", "/")
+                if prefix:
+                    if name == prefix.rstrip("/") or not name.startswith(prefix):
+                        continue
+                    name = name[len(prefix):]
+                if not name:
+                    continue
                 parts = [p for p in name.split("/") if p not in ("", ".")]
                 if any(p == ".." for p in parts) or os.path.isabs(name):
                     return {
@@ -107,7 +149,7 @@ def install(url: str, skills_dir: Path) -> dict:
                         "msg": f"交付包含非法路径条目，已拒绝安装：{member.filename}",
                         "url": url,
                     }
-            n = safe_extract(zf, skills_dir)
+            n = safe_extract(zf, skills_dir, strip_prefix=prefix)
 
         return {
             "code": "success",
