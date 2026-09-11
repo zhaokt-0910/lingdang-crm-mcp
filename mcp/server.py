@@ -6,6 +6,13 @@
   - HTTP 调用由 urllib 实现（crm_client.py）
   - 工具集在 v3 基础上扩展（13 个），新增 search_modules / query_module_summary / resolve_reference / update_record，多账套注册表 instances.json 热重载
 
+v4.9 更新：
+  - 新增自动化推进三件套：get_advance_tasks（查看推进任务及状态，只读）/ advance_push（推进阶段，
+    两阶段确认，走官方 TaskCompleteCheck + updateModuleAdvanceStage 链路，自动记录推进日志）/
+    get_advance_logs（查看推进日志：阶段变更记录 + 任务完成日志）
+  - 推进前按官方规则校验未完成的必做任务，有则拒绝并返回清单；推进依据字段被锁定时须走 advance_push
+  - 工具集清单同步补全（此前线索公海/工商信息/超链接解析等工具未登记）
+
 v4.7 更新：
   - 新增公海客户五件套：get_public_pool_list（公海池列表）/ allocate_account（领取/分配）/
     release_account（释放）/ delay_account（延期）/ convert_account（变更公海/转普通）
@@ -27,7 +34,7 @@ v4.4 更新：
   - PHP 端新增 resolveReference（名称模糊查找）+ querySummary（聚合统计）两个接口实现
   - create() 新增明细行验证：save 后检查实际明细行数，不足时返回 record_id 并提示用户自行处理
 
-工具集（26 个）：
+工具集（36 个）：
   setup_instance        — 注册 CRM 账套（探活通过后保存）
   list_instances        — 列出已配置账套
   login                 — 用户名+密码登录（获取 session_token，后续工具依赖此步骤）
@@ -35,21 +42,35 @@ v4.4 更新：
   list_modules          — 列出所有可用模块
   search_modules        — 按关键词搜索模块（避免拉全量 300+ 模块列表）
   get_module_fields     — 获取指定模块的字段清单（compact 模式只返回 fieldName+zhlabel）
+  get_picklist_values   — 获取下拉/选择类字段的有效值（走官方 cls_PickList 链路）
   resolve_reference     — 名称/编号 → record_id 查找器（模糊匹配，支持 Users/Accounts 等）
+  resolve_href_by_ids   — 批量记录 ID → 超链接字段值（客户名/单据主题等）
+  resolve_ids_by_href   — 批量超链接字段值 → 记录 ID（精确匹配）
   query_module_data     — 通用条件查询（字段白名单 + 过滤 + 排序 + 分页）
   query_module_summary  — 聚合查询（count + sum，不返明细，统计类问题首选）
   get_record            — 单条记录详情（含表体明细）
   create_record         — 动态创建记录（带明细时自动验证明细行数，失败时提示用户处理）
   update_record         — 编辑已有记录（表头增量更新 + 明细行级增删改，审批中/已批准拒绝编辑）
-  get_erp_stock        — ERP 实时库存查询（按产品编码批量查询）
+  business_search       — 工商信息查询（按模块工商授权与字段权限执行）
+  business_backfill_preview — 工商信息回填预览（选定公司数据转字段，不写入）
+  business_backfill_apply   — 工商信息回填执行（客户确认后回填到新建或已有记录）
+  get_erp_stock         — ERP 实时库存查询（按产品编码批量查询）
   get_public_pool_list  — 公海池配置列表（查看可用公海池 ID）
   allocate_account      — 领取/分配公海客户
   release_account       — 释放公海客户（释放回公海未分配）
   delay_account         — 延期公海客户（延长保护期）
   convert_account       — 公海分配/变更公海（转公海/转普通/池间变更）
+  get_leads_public_pool_list — 线索公海池配置列表
+  allocate_leads        — 领取/分配公海线索
+  release_leads         — 释放公海线索（释放回公海未分配）
+  delay_leads           — 延期公海线索（延长保护期）
+  convert_leads         — 线索公海分配/变更公海（转公海/转普通/池间变更）
   workreport_list       — 工作汇报列表（日志/周计划/月计划，非标准模块专用）
   workreport_create     — 新建工作汇报（日志/周计划/月计划，含编号/接收人/提醒）
   workreport_update     — 编辑工作汇报（仅创建者、未点评可编辑，写编辑痕迹）
+  get_advance_tasks     — 查看自动化推进任务及状态（只读，含必做任务完成情况与可推进目标）
+  advance_push          — 推进单据阶段（两阶段确认，走官方推进链路并记录推进日志）
+  get_advance_logs      — 查看推进日志（阶段变更记录 + 任务完成日志）
 
 使用前提：
   1. 部署 PHP 侧文件到 CRM：crmapi/mcp_login.php、crmapi/modules/Mcp_auth_api.php、Mcp_api.php
@@ -1648,8 +1669,8 @@ def get_advance_logs(
 # ── 启动 ──
 if __name__ == "__main__":
     instances = load_instances()
-    logger.info("启动 v4.8 零依赖版，已配置账套: %s", ", ".join(instances.keys()) or "(无，请先调用 setup_instance 注册)")
+    logger.info("启动 v4.9 零依赖版，已配置账套: %s", ", ".join(instances.keys()) or "(无，请先调用 setup_instance 注册)")
     run_stdio(
         registry,
-        server_info={"name": "lingdang-crm-auth", "version": "4.8.0"},
+        server_info={"name": "lingdang-crm-auth", "version": "4.9.0"},
     )
