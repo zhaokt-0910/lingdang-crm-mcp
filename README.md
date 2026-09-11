@@ -42,6 +42,21 @@ lingdang-crm-setup/
 
 实施方把 zip 放到云环境/客户可访问的地址，客户只需在对话里给一个链接：
 
+**A1 GitHub 直链（免维护，官方仓库自动打包）**
+
+```
+① 对话：从 https://github.com/zhaokt-0910/lingdang-crm-mcp/archive/refs/heads/main.zip 下载安装灵当CRM，
+         然后连接我的CRM，地址是 http://192.168.1.100/crm，叫"上海账套"
+② 信任：WorkBuddy 连接器管理页对 lingdang-crm-auth 点一次「信任」（仅首次）
+③ 登录：admin / ******** → 之后纯对话查询、建单、切账套
+```
+
+GitHub 打包的 zip 根目录是 `lingdang-crm-mcp-main/`，v4.4 起安装脚本已兼容
+（自动剥离根前缀，统一落位为 `lingdang-crm-setup/`），无需手工重打包。
+仓库地址：https://github.com/zhaokt-0910/lingdang-crm-mcp
+
+**A2 自托管 zip（云环境/自有服务器）**
+
 ```
 ① 对话：从 https://你的地址/lingdang-crm-setup-v4.1.zip 下载安装灵当CRM，
          然后连接我的CRM，地址是 http://192.168.1.100/crm，叫"上海账套"
@@ -50,7 +65,7 @@ lingdang-crm-setup/
 ```
 
 WorkBuddy 会自动：下载 zip → 校验（是 zip / 含 SKILL.md / 无非法路径）→
-解压到 `~/.workbuddy/skills/` → 跑配置向导注册账套。
+解压到 `~/.workbuddy/skills/lingdang-crm-setup` → 跑配置向导注册账套。
 
 ### 方式 B：手动安装（兜底，与方式 A 完全等价，可随时混用）
 
