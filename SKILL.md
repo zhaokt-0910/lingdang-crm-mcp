@@ -39,6 +39,9 @@ lingdang-crm-setup/
 客户把交付包 zip 放在云环境/服务器上，只给 WorkBuddy 一个下载地址，即可自动安装：
 
 1. 从用户描述中提取**下载地址**（zip 链接）。
+   - GitHub 仓库直链也可直接使用（推荐，免维护）：
+     `https://github.com/zhaokt-0910/lingdang-crm-mcp/archive/refs/heads/main.zip`
+     （安装脚本会自动剥离 GitHub 打包的 `<repo>-<branch>/` 根前缀）
 2. 执行：
    ```
    python scripts/install_from_url.py --url <zip下载地址>
